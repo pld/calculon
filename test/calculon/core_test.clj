@@ -1,6 +1,6 @@
-(ns calculate.core-test
+(ns calculon.core-test
   (:require [clojure.test :refer :all]
-            [calculate.core :refer :all]))
+            [calculon.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."

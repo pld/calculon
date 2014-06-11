@@ -1,5 +1,5 @@
-(ns calculate.views.calculator
-  (:require [calculate.views.layout :as layout]
+(ns calculon.views.calculator
+  (:require [calculon.views.layout :as layout]
             [hiccup.core :refer [h]]
             [hiccup.form :as form]))
 

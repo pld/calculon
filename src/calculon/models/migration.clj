@@ -1,6 +1,6 @@
-(ns calculate.models.migration
+(ns calculon.models.migration
   (:require [clojure.java.jdbc :as sql]
-            [calculate.models.dataset :as dataset]))
+            [calculon.models.dataset :as dataset]))
 
 (defn migrated? []
   (-> (sql/query dataset/spec

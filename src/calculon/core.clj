@@ -1,11 +1,11 @@
-(ns calculate.core
+(ns calculon.core
   (:require [compojure.core :refer [defroutes GET]]
             [ring.adapter.jetty :as ring]
             [compojure.route :as route]
             [compojure.handler :as handler]
-            [calculate.controllers.calculator :as calculator]
-            [calculate.views.layout :as layout]
-            [calculate.models.migration :as schema])
+            [calculon.controllers.calculator :as calculator]
+            [calculon.views.layout :as layout]
+            [calculon.models.migration :as schema])
   (:gen-class))
 
 (defroutes routes

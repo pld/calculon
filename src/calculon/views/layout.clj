@@ -1,4 +1,4 @@
-(ns calculate.views.layout
+(ns calculon.views.layout
   (:require [hiccup.page :as h]))
 
 (defn common [title & body]

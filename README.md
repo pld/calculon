@@ -1,4 +1,4 @@
-# Calculate
+# Calculon
 
 A Clojure library designed to ... well, calculate.
 
@@ -6,7 +6,7 @@ A Clojure library designed to ... well, calculate.
 
 ```bash
 lein uberjar
-java $JVM_OPTS -jar target/calculate-standalone.jar
+java $JVM_OPTS -jar target/calculon-standalone.jar
 ```
 
 ## License
