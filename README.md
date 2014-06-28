@@ -1,5 +1,7 @@
 # Calculon
 
+![calculon icon](https://raw.githubusercontent.com/pld/calculon/master/resources/img/calculon.png)
+
 A Clojure library designed to ... well, calculate.
 
 ## Usage
