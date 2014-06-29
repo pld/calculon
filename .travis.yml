@@ -1,0 +1,5 @@
+lein: lein2
+language: clojure
+script: lein2 midje
+notifications:
+  irc: 'irc.freenode.org#onatest'
