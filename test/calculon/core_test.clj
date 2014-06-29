@@ -1,7 +1,10 @@
 (ns calculon.core-test
-  (:require [clojure.test :refer :all]
-            [calculon.core :refer :all]))
+  (:use midje.sweet
+        calculon.core)
+  (:require [ring.adapter.jetty :as ring]))
 
-(deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+(fact "start runs the app"
+      (start :port) => :res
+      (provided
+       (ring/run-jetty app {:port :port
+                            :join? false}) => :res))
