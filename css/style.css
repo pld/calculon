@@ -1,4 +1,17 @@
 a, a:visited, body {
-    color: white;
-    background-color: black;
+    color: black;
+    background-color: white;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+table, th, td {
+    border: 1px solid white;
+    padding: 0.8em 2em;
+}
+
+.column-names td {
+    text-align: right;
 }

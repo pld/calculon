@@ -5,19 +5,52 @@
             [gza.data :refer [data]]
             [milia.api.dataset :as dataset]
             [milia.utils.remote :as remote]
-            [clojure.set :as set]))
+            [goog.string :as gstring]
+            [goog.string.format]))
 
 (swap! remote/hosts assoc :data "api.ona.io")
 
 (def proportion-unique 0.5)
 
-(defn median [ns]
+;;; Math helpers, all pure and memoizable
+
+(defn median* [ns]
   (let [ns (sort ns)
         cnt (count ns)
         mid (bit-shift-right cnt 1)]
     (if (odd? cnt)
       (nth ns mid)
       (/ (+ (nth ns mid) (nth ns (dec mid))) 2))))
+
+(def median (memoize median*))
+
+(defn mean*
+  [l]
+  (/ (reduce + l) (count l)))
+
+(def mean (memoize mean*))
+
+(defn variance*
+  [l]
+  (let [mv (mean l)]
+    (/ (reduce + (map #(Math/pow (- % mv) 2) l)) (count l))))
+
+(def variance (memoize variance*))
+
+(defn std* [l] (-> l variance Math/sqrt))
+
+(def std (memoize std*))
+
+(defn linspace*
+  "Generates n evenly-spaced points, with distance (x2-x1)/(n-1) between
+   points."
+  [x1 x2 n]
+  (let [spacing (/ (- x2 x1) (dec n))]
+    (range x1 (+ x1 (* spacing n)) spacing)))
+
+(def linspace (memoize linspace*))
+
+;;;
 
 (defn- category-like?
   "Return true if v looks like a category. We expect v is a category if the
@@ -142,6 +175,17 @@
             agg-units)]]
       [col (compute-outlier-scores agg->frequencies)])))
 
+(defn- get-class
+  [score scores]
+  (let [div (/ (- score (mean scores)) (std scores))]
+    ({0 "rgb(255, 229, 229)"
+      1 "rgb(255, 184, 184)"
+      2 "rgb(255, 138, 138)"
+      3 "rgb(255, 92, 92)"
+      4 "rgb(255, 0, 0)"}
+     (apply max
+               (map-indexed #(if (> div %2) %1 0) (linspace 0 2 5))))))
+
 (defn get-data
   [aggregation-col]
   (run-algorithm data aggregation-col)
@@ -164,10 +208,13 @@
               (for [header enumerators]
                 [:th header])]
              (for [[col scores] data]
-               [:tr
+               [:tr.column-names
                 [:td col]
-                (for [enumerator enumerators]
-                  [:td (get scores enumerator)])])])]
+                (for [enumerator enumerators
+                      :let [score (get scores enumerator)
+                            score-class (get-class score (vals scores))]]
+                  [:td {:style {"background-color" score-class}}
+                   (gstring/format "%.2f" score)])])])]
          [:div [:a {:href "#"
 ;                    :onClick (get-data)
                     }
