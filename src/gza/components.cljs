@@ -156,11 +156,18 @@
   [state]
   (html [:div
          [:h1 "Build s-Values"]
-         [:div
-;          (pr-str (get-data "section_a/a1_enumerator_code"))
-          (for [row (get-data "section_a/a1_enumerator_code")]
-            [:p (pr-str row)])
-          ]
+         [:table
+          (let [data (get-data "section_a/a1_enumerator_code")
+                enumerators (-> data first last keys sort)]
+            [[:tr
+              [:th]
+              (for [header enumerators]
+                [:th header])]
+             (for [[col scores] data]
+               [:tr
+                [:td col]
+                (for [enumerator enumerators]
+                  [:td (get scores enumerator)])])])]
          [:div [:a {:href "#"
 ;                    :onClick (get-data)
                     }
