@@ -143,10 +143,10 @@
   [data aggregation-col & {:keys [categorical-cols null-responses]
                            :or {null-responses ["n/a" "" [] nil [nil nil]]}}]
   (let [cols->data (json-list->col-vectors data null-responses)
-        col-names (keys cols->data)
-        categorical-cols (remove #(in? [aggregation-col] %)
-                                 (or categorical-cols
-                                     (get-categorical-cols cols->data)))
+        categorical-cols (keys cols->data)
+        ;; (remove #(in? [aggregation-col] %)
+        ;;                          (or categorical-cols
+        ;;                              (get-categorical-cols cols->data)))
         agg-units (distinct (get cols->data aggregation-col))
         agg-units->col->freqs (update-values
                                (group-by #(get % aggregation-col) data)
@@ -189,15 +189,21 @@
 
 (defn get-data
   [state]
+  (swap! state dissoc :data :aggregation-col)
   (go
     (binding [remote/*credentials* (select-keys @state [:username :password])]
       (let [{:keys [body status]} (<! (dataset/data 137955
-                                                        :query-params
-                                                        {:limit 100}))]
+                                                    :query-params
+                                                    {
+                                                     :query "{\"_id\":{\"$lt\": 7702916}}"
+;                                         :limit 100
+                                                     }))]
         (when (= 200 status)
           (swap! state assoc :data body))))))
 
 ;;; UI
+
+(def aggregation-col-id "aggregation-col")
 
 (defn- get-class
   [score scores]
@@ -214,34 +220,47 @@
   [x]
   (-> x str (subs 1)))
 
+(defn get-aggregation-col
+  []
+  (let [agg-el (.getElementById js/document aggregation-col-id)]
+    (keyword
+     (.-value (aget (.-options agg-el)
+                    (.-selectedIndex agg-el))))))
+
 (defn capture-typing
   [state]
   (html [:div
-         [:h1 "Build s-Values"]
+         [:h1 "Create s-Values for a Dataset"]
          (let [{:keys [aggregation-col data]} @state]
-           [[:div
-            "username"
-            [:input#username
-             {:onBlur #(swap! state assoc :username (.. % -target -value))}]
-            "password"
-            [:input#password
-             {:onBlur #(swap! state assoc :password (.. % -target -value))
-              :type "password"}]
-            [:a {:href "#"
-                 :onClick #(get-data state)}
-             "Capture"]]
-            (when data
-              [:select
-               {:onBlur #(swap! state
-                                assoc
-                                :aggregation-col
-                                (keyword
-                                 (.. % -target -value)))}
-               (for [col (->> data first keys (map full-name) sort)]
-                 [:option {:value col}
-                  col])])
-            (if (and data aggregation-col)
-              [:table
+           [[:p {:key "login"}
+             "username"
+             [:input#username
+              {:onBlur #(swap! state assoc :username (.. % -target -value))}]
+             "password"
+             [:input#password
+              {:onBlur #(swap! state assoc :password (.. % -target -value))
+               :type "password"}]
+             [:input {:type "submit"
+                      :onClick #(get-data state)
+                      :value "Load"}]]
+            [:p {:key "aggregation-column"}
+             (if (and data (-> data count zero? not))
+               [[:select {:id aggregation-col-id
+                          :key "select"}
+                 (for [col (->> data first keys (map full-name) sort)]
+                   [:option {:key col
+                             :value col}
+                    col])]
+                [:input {:key "submit"
+                         :type "submit"
+                         :onClick #(swap! state
+                                          assoc
+                                          :aggregation-col
+                                          (get-aggregation-col))
+                         :value "Compute s-Values"}]]
+               "No data")]
+            (when (and data aggregation-col)
+              [:table {:key "table"}
                (let [cols->scores (run-algorithm data
                                                  aggregation-col)
                      enumerators (-> cols->scores first last keys sort)
