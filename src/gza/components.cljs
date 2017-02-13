@@ -1,8 +1,9 @@
 (ns gza.components
   (:import [java.lang.Math])
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [sablono.core :refer [html]]
             [chimera.seq :refer [in? transpose update-values]]
-            [gza.data :refer [data]]
+            [cljs.core.async :refer [<!]]
             [milia.api.dataset :as dataset]
             [milia.utils.remote :as remote]
             [goog.string :as gstring]
@@ -187,12 +188,14 @@
 ;;; Retrieving data
 
 (defn get-data
-  [username password]
-  (binding [remote/*credentials*
-            {:username username
-             :password password}]
-    (dataset/data 137955
-                  :query-params {:limit 100})))
+  [state]
+  (go
+    (binding [remote/*credentials* (select-keys @state [:username :password])]
+      (let [{:keys [body status]} (<! (dataset/data 137955
+                                                        :query-params
+                                                        {:limit 100}))]
+        (when (= 200 status)
+          (swap! state assoc :data body))))))
 
 ;;; UI
 
@@ -205,55 +208,69 @@
       3 "rgb(255, 92, 92)"
       4 "rgb(255, 0, 0)"}
      (apply max
-               (map-indexed #(if (> div %2) %1 0) (linspace 0 2 5))))))
+            (map-indexed #(if (> div %2) %1 0) (linspace 0 2 5))))))
 
+(defn- full-name
+  [x]
+  (-> x str (subs 1)))
 
 (defn capture-typing
   [state]
   (html [:div
          [:h1 "Build s-Values"]
-         [:div
-          "username"
-          [:input#username
-           {:onBlur #(swap! state assoc :username (.. % -target -value))}]
-          "password"
-          [:input#password
-           {:onBlur #(swap! state assoc :password (.. % -target -value))
-            :type "password"}]
-          [:a {:href "#"
-               :onClick #(get-data (:username @state)
-                                   (:password @state))}
-                "Capture"]]
-         [:table
-          (let [cols->scores (run-algorithm data
-                                            "section_a/a1_enumerator_code")
-                enumerators (-> cols->scores first last keys sort)
-                averages (compute-averages cols->scores)]
-            [[:thead {:key "head"}
-              [:tr.highlight
-               [:th.column-names "Interviewer"]
-               (for [header enumerators]
-                 [:th {:key header} header])]]
-             [:tbody {:key "body"}
-              [:tr
-               [:td.column-names "Average"]
-               (for [average averages]
-                 [:td {:key average
-                       :style {"background-color" (get-class average
-                                                             averages)}}
-                  (gstring/format "%.1f" average)])]
-              [:tr.highlight
-               [:th.column-names "Form"]
-               (for [header enumerators]
-                 [:td {:key header}])]
-              (for [[col scores] cols->scores]
-                [:tr {:key col}
-                 [:td.column-names col]
-                 (for [enumerator enumerators
-                       :let [score (get scores enumerator)
-                             score-class (get-class score (vals scores))]]
-                   [:td {:key (str enumerator score)
-                         :style {"background-color" score-class}}
-                    (if (< score 1)
-                      "-"
-                      (gstring/format "%.1f" score))])])]])]]))
+         (let [{:keys [aggregation-col data]} @state]
+           [[:div
+            "username"
+            [:input#username
+             {:onBlur #(swap! state assoc :username (.. % -target -value))}]
+            "password"
+            [:input#password
+             {:onBlur #(swap! state assoc :password (.. % -target -value))
+              :type "password"}]
+            [:a {:href "#"
+                 :onClick #(get-data state)}
+             "Capture"]]
+            (when data
+              [:select
+               {:onBlur #(swap! state
+                                assoc
+                                :aggregation-col
+                                (keyword
+                                 (.. % -target -value)))}
+               (for [col (->> data first keys (map full-name) sort)]
+                 [:option {:value col}
+                  col])])
+            (if (and data aggregation-col)
+              [:table
+               (let [cols->scores (run-algorithm data
+                                                 aggregation-col)
+                     enumerators (-> cols->scores first last keys sort)
+                     averages (compute-averages cols->scores)]
+                 [[:thead {:key "head"}
+                   [:tr.highlight
+                    [:th.column-names "Interviewer"]
+                    (for [header enumerators]
+                      [:th {:key header} header])]]
+                  [:tbody {:key "body"}
+                   [:tr
+                    [:td.column-names "Average"]
+                    (for [average averages]
+                      [:td {:key average
+                            :style {"background-color" (get-class average
+                                                                  averages)}}
+                       (gstring/format "%.1f" average)])]
+                   [:tr.highlight
+                    [:th.column-names "Form"]
+                    (for [header enumerators]
+                      [:td {:key header}])]
+                   (for [[col scores] cols->scores]
+                     [:tr {:key (full-name col)}
+                      [:td.column-names (full-name col)]
+                      (for [enumerator enumerators
+                            :let [score (get scores enumerator)
+                                  score-class (get-class score (vals scores))]]
+                        [:td {:key (str enumerator score)
+                              :style {"background-color" score-class}}
+                         (if (< score 1)
+                           "-"
+                           (gstring/format "%.1f" score))])])]])])])]))

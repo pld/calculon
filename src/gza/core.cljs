@@ -1,7 +1,7 @@
 (ns gza.core
   (:require [gza.components :refer [capture-typing]]))
 
-(defonce app-state (atom {:words []}))
+(defonce app-state (atom {}))
 
 (defn render! []
   (.render js/ReactDOM
