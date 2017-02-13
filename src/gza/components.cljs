@@ -175,6 +175,27 @@
             agg-units)]]
       [col (compute-outlier-scores agg->frequencies)])))
 
+(defn compute-averages
+  [cols->scores]
+  (->> cols->scores
+       vals
+       (map #(into (sorted-map) %))
+       (map vals)
+       transpose
+       (map mean)))
+
+;;; Retrieving data
+
+(defn get-data
+  []
+  (binding [remote/*credentials*
+            {:username "mberg"
+             :token ""}]
+    (dataset/data 137955
+                  :query-params {:limit 100})))
+
+;;; UI
+
 (defn- get-class
   [score scores]
   (let [div (/ (- score (mean scores)) (std scores))]
@@ -186,36 +207,40 @@
      (apply max
                (map-indexed #(if (> div %2) %1 0) (linspace 0 2 5))))))
 
-(defn get-data
-  [aggregation-col]
-  (run-algorithm data aggregation-col)
-  ;; (binding [remote/*credentials*
-  ;;           {:username "mberg"
-  ;;            :token ""}]
-  ;;   (dataset/data 137955
-  ;;                 :query-params {:limit 100}))
-  )
 
 (defn capture-typing
   [state]
   (html [:div
          [:h1 "Build s-Values"]
          [:table
-          (let [data (get-data "section_a/a1_enumerator_code")
-                enumerators (-> data first last keys sort)]
+          (let [cols->scores (run-algorithm data
+                                            "section_a/a1_enumerator_code")
+                enumerators (-> cols->scores first last keys sort)
+                averages (compute-averages cols->scores)]
             [[:tr
-              [:th]
+              [:th.column-names "Interviewer"]
               (for [header enumerators]
                 [:th header])]
-             (for [[col scores] data]
+             [:tr.column-names
+              [:td "Average"]
+              (for [average averages]
+                [:td {:style {"background-color" (get-class average
+                                                            averages)}}
+                 (gstring/format "%.1f" average)])]
+             [:tr
+              [:th.column-names "Form"]
+              (for [header enumerators]
+                [:td])]
+             (for [[col scores] cols->scores]
                [:tr.column-names
                 [:td col]
                 (for [enumerator enumerators
                       :let [score (get scores enumerator)
                             score-class (get-class score (vals scores))]]
                   [:td {:style {"background-color" score-class}}
-                   (gstring/format "%.2f" score)])])])]
+                   (if (< score 1)
+                     "-"
+                     (gstring/format "%.1f" score))])])])]
          [:div [:a {:href "#"
-;                    :onClick (get-data)
-                    }
+                    :onClick #(get-data)}
                 "Capture"]]]))

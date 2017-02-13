@@ -12,6 +12,6 @@ table, th, td {
     padding: 0.8em 2em;
 }
 
-.column-names td {
+.column-names {
     text-align: right;
 }
