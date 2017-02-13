@@ -1,10 +1,12 @@
 a, a:visited, body {
     color: black;
     background-color: white;
+    font-family: 'proxima-nova', sans-serif;
 }
 
 table {
     border-collapse: collapse;
+    width: 100%;
 }
 
 table, th, td {
@@ -12,6 +14,15 @@ table, th, td {
     padding: 0.8em 2em;
 }
 
+tr.highlight th, tr.highlight td {
+    background-color: #ADD8F2;
+}
+
+td {
+    text-align: center;
+}
+
 .column-names {
     text-align: right;
+    width: 1em;
 }

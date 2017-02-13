@@ -187,10 +187,10 @@
 ;;; Retrieving data
 
 (defn get-data
-  []
+  [username password]
   (binding [remote/*credentials*
-            {:username "mberg"
-             :token ""}]
+            {:username username
+             :password password}]
     (dataset/data 137955
                   :query-params {:limit 100})))
 
@@ -212,35 +212,48 @@
   [state]
   (html [:div
          [:h1 "Build s-Values"]
+         [:div
+          "username"
+          [:input#username
+           {:onBlur #(swap! state assoc :username (.. % -target -value))}]
+          "password"
+          [:input#password
+           {:onBlur #(swap! state assoc :password (.. % -target -value))
+            :type "password"}]
+          [:a {:href "#"
+               :onClick #(get-data (:username @state)
+                                   (:password @state))}
+                "Capture"]]
          [:table
           (let [cols->scores (run-algorithm data
                                             "section_a/a1_enumerator_code")
                 enumerators (-> cols->scores first last keys sort)
                 averages (compute-averages cols->scores)]
-            [[:tr
-              [:th.column-names "Interviewer"]
-              (for [header enumerators]
-                [:th header])]
-             [:tr.column-names
-              [:td "Average"]
-              (for [average averages]
-                [:td {:style {"background-color" (get-class average
-                                                            averages)}}
-                 (gstring/format "%.1f" average)])]
-             [:tr
-              [:th.column-names "Form"]
-              (for [header enumerators]
-                [:td])]
-             (for [[col scores] cols->scores]
-               [:tr.column-names
-                [:td col]
-                (for [enumerator enumerators
-                      :let [score (get scores enumerator)
-                            score-class (get-class score (vals scores))]]
-                  [:td {:style {"background-color" score-class}}
-                   (if (< score 1)
-                     "-"
-                     (gstring/format "%.1f" score))])])])]
-         [:div [:a {:href "#"
-                    :onClick #(get-data)}
-                "Capture"]]]))
+            [[:thead {:key "head"}
+              [:tr.highlight
+               [:th.column-names "Interviewer"]
+               (for [header enumerators]
+                 [:th {:key header} header])]]
+             [:tbody {:key "body"}
+              [:tr
+               [:td.column-names "Average"]
+               (for [average averages]
+                 [:td {:key average
+                       :style {"background-color" (get-class average
+                                                             averages)}}
+                  (gstring/format "%.1f" average)])]
+              [:tr.highlight
+               [:th.column-names "Form"]
+               (for [header enumerators]
+                 [:td {:key header}])]
+              (for [[col scores] cols->scores]
+                [:tr {:key col}
+                 [:td.column-names col]
+                 (for [enumerator enumerators
+                       :let [score (get scores enumerator)
+                             score-class (get-class score (vals scores))]]
+                   [:td {:key (str enumerator score)
+                         :style {"background-color" score-class}}
+                    (if (< score 1)
+                      "-"
+                      (gstring/format "%.1f" score))])])]])]]))
