@@ -1,5 +1,4 @@
 (ns gza.components
-  (:import [java.lang.Math])
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [sablono.core :refer [html]]
             [chimera.seq :refer [in? transpose update-values]]
@@ -11,9 +10,16 @@
 
 (swap! remote/hosts assoc :data "api.ona.io")
 
+(def na-string "n/a")
 (def proportion-unique 0.5)
 
 ;;; Math helpers, all pure and memoizable
+
+(defn sum*
+  [l]
+  (reduce + l))
+
+(def sum (memoize sum))
 
 (defn median* [ns]
   (let [ns (sort ns)
@@ -27,14 +33,14 @@
 
 (defn mean*
   [l]
-  (/ (reduce + l) (count l)))
+  (/ (sum l) (count l)))
 
 (def mean (memoize mean*))
 
 (defn variance*
   [l]
   (let [mv (mean l)]
-    (/ (reduce + (map #(Math/pow (- % mv) 2) l)) (count l))))
+    (/ (sum (map #(Math/pow (- % mv) 2) l)) (count l))))
 
 (def variance (memoize variance*))
 
@@ -70,15 +76,11 @@
 
 (defn- normalize-counts
   "Returns a normalized frequency count. If all frequencies are 0 returns {}.
-   `frequencies` a map of frequencies
+   `freqs` a map of frequencies
    `val` the number the counts should add up to"
-  [frequencies & {:keys [val] :or {val 1}}]
-  (let [n (reduce + 0 (vals frequencies))]
-    (if (= n 0)
-      {}
-      (reduce-kv #(assoc %1 %2 (->> n (/ %3) (* val)))
-                 {}
-                 frequencies))))
+  [freqs & {:keys [val] :or {val 1}}]
+  (let [n (sum (vals freqs))]
+    (update-values freqs #(->> n (/ %) (* val)))))
 
 (defn- normalize
   "Divides everything in `m` by the median of the values. If the median is less
@@ -86,41 +88,42 @@
    entries."
   [m]
   (let [n (count m)
-        divisor (as-> (-> m vals median) d
-                  (if (< d (/ 1 n)) n d))]
-    (reduce-kv #(assoc %1 %2 (/ %3 divisor)) {} m)))
+        divisor (max (-> m vals median) (/ 1 n))]
+    (update-values m #(/ % divisor))))
 
 (defn- compute-outlier-scores
-  [agg->frequencies]
-  {:pre [(> (-> agg->frequencies keys count) 1)]}
-  (let [range (-> agg->frequencies vals first keys)
-        normalized-frequencies (reduce-kv #(assoc %1
-                                                  %2
-                                                  (normalize-counts %3))
-                                          {}
-                                          agg->frequencies)
+  [agg->freqs]
+  {:pre [(> (-> agg->freqs keys count) 1)]}
+  (let [range (-> agg->freqs vals first keys)
+        normalized-freqs (reduce-kv #(cond-> %1
+                                       (not (zero? (sum (vals %3))))
+                                       (assoc
+                                        %2
+                                        (normalize-counts %3)))
+                                    {}
+                                    agg->freqs)
         medians (reduce (fn [m r]
                           (assoc m
                                  r
                                  (median
                                   (map #(get % r)
-                                       (vals normalized-frequencies)))))
+                                       (vals normalized-freqs)))))
                         {}
                         range)
         outlier-values (reduce
                         (fn [m agg]
                           (assoc m
                                  agg
-                                 (reduce #(+ %1
-                                             (Math/abs
-                                              (- (-> normalized-frequencies
-                                                     (get agg)
-                                                     (get %2))
-                                                 (get medians %2))))
-                                         0
-                                         range)))
-                            {}
-                            (keys agg->frequencies))]
+                                 (if-let [freqs (get normalized-freqs agg)]
+                                   (reduce #(+ %1
+                                               (Math/abs
+                                                (- (get freqs %2)
+                                                   (get medians %2))))
+                                           0
+                                           range)
+                                   0)))
+                        {}
+                        (keys agg->freqs))]
     (normalize outlier-values)))
 
 (defn- json-list->col-vectors
@@ -131,7 +134,10 @@
                       k
                       (->> json-list
                            (map #(get % k))
-                           (remove #(in? ignored-values %)))))
+                           flatten
+                           (remove #(or (in? ignored-values %)
+                                        (map? %)
+                                        (vector? %))))))
      {}
      col-names)))
 
@@ -141,12 +147,12 @@
    `aggregation-col` key in the maps to aggregate using
    `categorical-cols` list of keys in maps to ran algorithm against"
   [data aggregation-col & {:keys [categorical-cols null-responses]
-                           :or {null-responses ["n/a" "" [] nil [nil nil]]}}]
+                           :or {null-responses [na-string nil]}}]
   (let [cols->data (json-list->col-vectors data null-responses)
-        categorical-cols (keys cols->data)
-        ;; (remove #(in? [aggregation-col] %)
-        ;;                          (or categorical-cols
-        ;;                              (get-categorical-cols cols->data)))
+        categorical-cols
+        (remove #(in? [aggregation-col] %)
+                                 (or categorical-cols
+                                     (get-categorical-cols cols->data)))
         agg-units (distinct (get cols->data aggregation-col))
         agg-units->col->freqs (update-values
                                (group-by #(get % aggregation-col) data)
@@ -155,7 +161,7 @@
     (for [col categorical-cols
           :let
           ;; all column values
-          [column-values (get cols->data col)
+          [col-values (distinct (get cols->data col))
            ;; create mapping
            ;; agg unit ->  all column values -> frequencies
            agg->frequencies
@@ -163,15 +169,15 @@
             (fn [m agg-unit]
               (assoc m
                      agg-unit
-                     (reduce
-                      #(assoc %1
-                              %2
-                              (-> agg-units->col->freqs
-                                  (get agg-unit)
-                                  (get col)
-                                  (get %2 0)))
-                      {}
-                      column-values)))
+                     (let [freqs (-> agg-units->col->freqs
+                                     (get agg-unit)
+                                     (get col))]
+                       (reduce
+                        #(assoc %1
+                                %2
+                                (get freqs %2 0))
+                        {}
+                        col-values))))
             {}
             agg-units)]]
       [col (compute-outlier-scores agg->frequencies)])))
@@ -192,12 +198,12 @@
   (swap! state dissoc :data :aggregation-col)
   (go
     (binding [remote/*credentials* (select-keys @state [:username :password])]
-      (let [{:keys [body status]} (<! (dataset/data 137955
-                                                    :query-params
-                                                    {
-                                                     :query "{\"_id\":{\"$lt\": 7702916}}"
-;                                         :limit 100
-                                                     }))]
+      (let [{:keys [body status]} (<!
+                                   (dataset/data
+                                    137955
+                                    :query-params
+                                    {:query "{\"_id\":{\"$lt\": 7702916}}"
+                                     :limit 100}))]
         (when (= 200 status)
           (swap! state assoc :data body))))))
 
@@ -230,7 +236,6 @@
 (defn capture-typing
   [state]
   (html [:div
-         [:h1 "Create s-Values for a Dataset"]
          (let [{:keys [aggregation-col data]} @state]
            [[:p {:key "login"}
              "username"
@@ -243,53 +248,65 @@
              [:input {:type "submit"
                       :onClick #(get-data state)
                       :value "Load"}]]
-            [:p {:key "aggregation-column"}
-             (if (and data (-> data count zero? not))
-               [[:select {:id aggregation-col-id
-                          :key "select"}
-                 (for [col (->> data first keys (map full-name) sort)]
-                   [:option {:key col
-                             :value col}
-                    col])]
-                [:input {:key "submit"
-                         :type "submit"
-                         :onClick #(swap! state
-                                          assoc
-                                          :aggregation-col
-                                          (get-aggregation-col))
-                         :value "Compute s-Values"}]]
-               "No data")]
-            (when (and data aggregation-col)
-              [:table {:key "table"}
-               (let [cols->scores (run-algorithm data
-                                                 aggregation-col)
-                     enumerators (-> cols->scores first last keys sort)
-                     averages (compute-averages cols->scores)]
-                 [[:thead {:key "head"}
-                   [:tr.highlight
-                    [:th.column-names "Interviewer"]
-                    (for [header enumerators]
-                      [:th {:key header} header])]]
-                  [:tbody {:key "body"}
-                   [:tr
-                    [:td.column-names "Average"]
-                    (for [average averages]
-                      [:td {:key average
-                            :style {"background-color" (get-class average
-                                                                  averages)}}
-                       (gstring/format "%.1f" average)])]
-                   [:tr.highlight
-                    [:th.column-names "Form"]
-                    (for [header enumerators]
-                      [:td {:key header}])]
-                   (for [[col scores] cols->scores]
-                     [:tr {:key (full-name col)}
-                      [:td.column-names (full-name col)]
-                      (for [enumerator enumerators
-                            :let [score (get scores enumerator)
-                                  score-class (get-class score (vals scores))]]
-                        [:td {:key (str enumerator score)
-                              :style {"background-color" score-class}}
-                         (if (< score 1)
-                           "-"
-                           (gstring/format "%.1f" score))])])]])])])]))
+            (if (and data (-> data count zero? not))
+              (let [columns (->> data
+                                 (map keys)
+                                 flatten
+                                 distinct
+                                 (map full-name)
+                                 sort)]
+                [[:p {:key "aggregation-column"}
+                  [:select {:id aggregation-col-id
+                            :key "select"}
+                   (for [col columns]
+                     [:option {:key col
+                               :value col}
+                      col])]
+                  [:input {:key "submit"
+                           :type "submit"
+                           :onClick #(swap! state
+                                            assoc
+                                            :aggregation-col
+                                            (get-aggregation-col))
+                           :value "Compute s-Values"}]]
+                 (when aggregation-col
+                   (let [cols->scores (run-algorithm data
+                                                     aggregation-col)
+                         enumerators (-> cols->scores first last keys sort)
+                         averages (compute-averages cols->scores)]
+                     [[:div [:p
+                             (count cols->scores)
+                             " of "
+                             (count columns)
+                             " columns included below."]]
+                      [:table {:key "table"}
+                       [:thead {:key "head"}
+                        [:tr.highlight
+                         [:th.column-names "Interviewer"]
+                         (for [header enumerators]
+                           [:th {:key header} header])]]
+                       [:tbody {:key "body"}
+                        [:tr
+                         [:td.column-names "Average"]
+                         (for [average averages]
+                           [:td {:key average
+                                 :style {"background-color"
+                                         (get-class average averages)}}
+                            (gstring/format "%.1f" average)])]
+                        [:tr.highlight
+                         [:th.column-names "Form"]
+                         (for [header enumerators]
+                           [:td {:key header}])]
+                        (for [[col scores] cols->scores]
+                          [:tr {:key (full-name col)}
+                           [:td.column-names (full-name col)]
+                           (for [enumerator enumerators
+                                 :let [score (get scores enumerator)
+                                       score-class (get-class score
+                                                              (vals scores))]]
+                             [:td {:key (str enumerator score)
+                                   :style {"background-color" score-class}}
+                              (if (< score 1)
+                                "-"
+                                (gstring/format "%.1f" score))])])]]]))])
+              "No data")])]))
