@@ -15,11 +15,9 @@
 
 ;;; Math helpers, all pure and memoizable
 
-(defn sum*
+(defn sum
   [l]
-  (reduce + l))
-
-(def sum (memoize sum))
+  (reduce + 0 l))
 
 (defn median* [ns]
   (let [ns (sort ns)
@@ -149,8 +147,7 @@
   [data aggregation-col & {:keys [categorical-cols null-responses]
                            :or {null-responses [na-string nil]}}]
   (let [cols->data (json-list->col-vectors data null-responses)
-        categorical-cols
-        (remove #(in? [aggregation-col] %)
+        categorical-cols (remove #(in? [aggregation-col] %)
                                  (or categorical-cols
                                      (get-categorical-cols cols->data)))
         agg-units (distinct (get cols->data aggregation-col))
@@ -164,23 +161,22 @@
           [col-values (distinct (get cols->data col))
            ;; create mapping
            ;; agg unit ->  all column values -> frequencies
-           agg->frequencies
-           (reduce
-            (fn [m agg-unit]
-              (assoc m
-                     agg-unit
-                     (let [freqs (-> agg-units->col->freqs
-                                     (get agg-unit)
-                                     (get col))]
-                       (reduce
-                        #(assoc %1
-                                %2
-                                (get freqs %2 0))
-                        {}
-                        col-values))))
-            {}
-            agg-units)]]
-      [col (compute-outlier-scores agg->frequencies)])))
+           agg->freqs (reduce
+                       (fn [m agg-unit]
+                         (assoc m
+                                agg-unit
+                                (let [freqs (-> agg-units->col->freqs
+                                                (get agg-unit)
+                                                (get col))]
+                                  (reduce
+                                   #(assoc %1
+                                           %2
+                                           (get freqs %2 0))
+                                   {}
+                                   col-values))))
+                       {}
+                       agg-units)]]
+      [col (compute-outlier-scores agg->freqs)])))
 
 (defn compute-averages
   [cols->scores]
@@ -202,8 +198,7 @@
                                    (dataset/data
                                     137955
                                     :query-params
-                                    {:query "{\"_id\":{\"$lt\": 7702916}}"
-                                     :limit 100}))]
+                                    {:limit 1000}))]
         (when (= 200 status)
           (swap! state assoc :data body))))))
 
