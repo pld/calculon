@@ -3,6 +3,7 @@
 /lib
 /classes
 /checkouts
+/resources/public/cljs
 pom.xml
 pom.xml.asc
 *.class
