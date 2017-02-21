@@ -12,7 +12,7 @@ table {
 
 table, th, td {
     border: 1px solid white;
-    padding: 0.8em 2em;
+    padding: .8em 2em;
 }
 
 tr.highlight th, tr.highlight td {
@@ -26,4 +26,12 @@ td {
 .column-names {
     text-align: right;
     width: 1em;
+}
+
+input {
+    margin: 0 .5em;
+}
+
+select {
+    margin: 0 0.5em 0 0 ;
 }
