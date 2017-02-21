@@ -1,4 +1,4 @@
-(defproject gza "0.1.0-SNAPSHOT"
+(defproject calculon "0.1.0-SNAPSHOT"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.229"]
                  [org.clojure/core.async "0.2.395"]
@@ -12,7 +12,7 @@
               [{:id "dev"
                 :source-paths ["src"]
                 :figwheel true
-                :compiler {:main "gza.core"
+                :compiler {:main "calculon.core"
                            ;; add the following
                            :asset-path "cljs/out"
                            :output-to "resources/public/cljs/main.js"

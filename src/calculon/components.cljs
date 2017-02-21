@@ -1,4 +1,4 @@
-(ns gza.components
+(ns calculon.components
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [sablono.core :refer [html]]
             [chimera.seq :refer [in? transpose update-values]]
@@ -245,7 +245,7 @@
     id
     (get-selected-value dataset-id-select)))
 
-(defn capture-typing
+(defn data-loader
   [state]
   (html [:div
          (let [{:keys [aggregation-col data datasets]} @state]
