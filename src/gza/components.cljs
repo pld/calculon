@@ -189,22 +189,30 @@
 
 ;;; Retrieving data
 
+(defn get-datasets
+  [state]
+  (go
+    (binding [remote/*credentials* (select-keys @state [:username :password])]
+      (let [{:keys [body status]} (<! (dataset/all (:username @state)))]
+        (when (= 200 status)
+          (swap! state assoc :datasets body))))))
+
 (defn get-data
   [state]
   (swap! state dissoc :data :aggregation-col)
   (go
     (binding [remote/*credentials* (select-keys @state [:username :password])]
-      (let [{:keys [body status]} (<!
-                                   (dataset/data
-                                    137955
-                                    :query-params
-                                    {:limit 1000}))]
+      (let [{:keys [body status]} (<! (dataset/data (:dataset-id @state)
+                                                    :query-params
+                                                    {:limit 1000}))]
         (when (= 200 status)
           (swap! state assoc :data body))))))
 
 ;;; UI
 
 (def aggregation-col-id "aggregation-col")
+(def dataset-id-enter "dataset-id-enter")
+(def dataset-id-select "dataset-id-select")
 
 (defn- get-class
   [score scores]
@@ -221,18 +229,31 @@
   [x]
   (-> x str (subs 1)))
 
-(defn get-aggregation-col
+(defn get-selected-value
+  [id]
+  (let [el (.getElementById js/document id)]
+    (.-value (aget (.-options el)
+                   (.-selectedIndex el)))))
+
+(defn- get-aggregation-col
   []
-  (let [agg-el (.getElementById js/document aggregation-col-id)]
-    (keyword
-     (.-value (aget (.-options agg-el)
-                    (.-selectedIndex agg-el))))))
+  (keyword (get-selected-value aggregation-col-id)))
+
+(defn- get-dataset-id
+  []
+  (if-let [id (.-value (.getElementById js/document dataset-id-enter))]
+    id
+    (get-selected-value dataset-id-select)))
 
 (defn capture-typing
   [state]
   (html [:div
-         (let [{:keys [aggregation-col data]} @state]
-           [[:p {:key "login"}
+         (let [{:keys [aggregation-col data datasets]} @state]
+           [[:p
+             "Calculate the s-Values for an Ona dataset grouped by a chosen"
+             " column. You can enter a custom dataset ID in the text field"
+             " after loading your credentials."]
+            [:p {:key "login"}
              "username"
              [:input#username
               {:onBlur #(swap! state assoc :username (.. % -target -value))}]
@@ -241,8 +262,30 @@
               {:onBlur #(swap! state assoc :password (.. % -target -value))
                :type "password"}]
              [:input {:type "submit"
-                      :onClick #(get-data state)
+                      :onClick #(get-datasets state)
                       :value "Load"}]]
+            (when datasets
+              [:p
+               [:select {:id dataset-id-select
+                         :key "dataset-id-select"}
+                (for [{:keys [formid title]} (sort-by :title datasets)]
+                  [:option {:key formid
+                            :value formid}
+                   title])]
+               "or"
+               [:input {:key "dataset-id-enter"
+                        :id dataset-id-enter
+                        :value 137955
+                        :type "number"}]
+               [:input {:key "dataset-id-submit"
+                        :type "submit"
+                        :onClick #(do
+                                    (swap! state
+                                           assoc
+                                           :dataset-id
+                                           (get-dataset-id))
+                                    (get-data state))
+                        :value "Load"}]])
             (if (and data (-> data count zero? not))
               (let [columns (->> data
                                  (map keys)
@@ -252,12 +295,12 @@
                                  sort)]
                 [[:p {:key "aggregation-column"}
                   [:select {:id aggregation-col-id
-                            :key "select"}
+                            :key "agg-col-select"}
                    (for [col columns]
                      [:option {:key col
                                :value col}
                       col])]
-                  [:input {:key "submit"
+                  [:input {:key "agg-col-submit"
                            :type "submit"
                            :onClick #(swap! state
                                             assoc
