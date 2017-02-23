@@ -190,6 +190,8 @@
 
 ;;; Retrieving data
 
+(def default-json-url "https://data.cityofnewyork.us/resource/w7a6-9xrz.json")
+
 (defn get-datasets
   [state]
   (go
@@ -235,7 +237,7 @@
 
 (defn- full-name
   [x]
-  (-> x str (subs 1)))
+  (cond-> x keyword? (-> str (subs 1))))
 
 (defn get-selected-value
   [id]
@@ -265,7 +267,7 @@
               [:input#url
                {:onBlur #(swap! state assoc :json-url (.. % -target -value))
                 :size 60
-                :value "https://data.cityofnewyork.us/resource/w7a6-9xrz.json"}]
+                :value default-json-url}]
               [:input {:type "submit"
                        :onClick #(get-json-url state)
                        :value "Load"}]]
