@@ -1,4 +1,6 @@
-a, a:visited, body {
+a,
+a:visited,
+body {
     color: black;
     background-color: white;
     font-family: 'proxima-nova', sans-serif;
@@ -15,7 +17,8 @@ table, th, td {
     padding: .8em 2em;
 }
 
-tr.highlight th, tr.highlight td {
+tr.highlight th,
+tr.highlight td {
     background-color: #ADD8F2;
 }
 
@@ -34,4 +37,20 @@ input {
 
 select {
     margin: 0 0.5em 0 0 ;
+}
+
+p.highlight,
+span.highlight {
+    padding: 0.5em;
+    background-color: #F3F3F3;
+    border: 1px #000 solid;
+}
+
+span.disjunction-spacer {
+    font-style: italic;
+    padding: 0 0.5em;
+}
+
+p.grouping {
+    margin-top: 2em;
 }

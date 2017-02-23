@@ -3,6 +3,7 @@
   (:require [sablono.core :refer [html]]
             [chimera.seq :refer [in? transpose update-values]]
             [cljs.core.async :refer [<!]]
+            [cljs-http.client :as http]
             [milia.api.dataset :as dataset]
             [milia.utils.remote :as remote]
             [goog.string :as gstring]
@@ -208,6 +209,13 @@
         (when (= 200 status)
           (swap! state assoc :data body))))))
 
+(defn get-json-url
+  [state]
+  (go
+    (let [{:keys [body status]} (<! (http/get (:json-url @state)
+                                              {:with-credentials? false}))]
+      (when (= 200 status)
+        (swap! state assoc :data body)))))
 ;;; UI
 
 (def aggregation-col-id "aggregation-col")
@@ -249,21 +257,30 @@
   [state]
   (html [:div
          (let [{:keys [aggregation-col data datasets]} @state]
-           [[:p
-             "Calculate the s-Values for an Ona dataset grouped by a chosen"
-             " column. You can enter a custom dataset ID in the text field"
-             " after loading your credentials."]
-            [:p {:key "login"}
-             "username"
-             [:input#username
-              {:onBlur #(swap! state assoc :username (.. % -target -value))}]
-             "password"
-             [:input#password
-              {:onBlur #(swap! state assoc :password (.. % -target -value))
-               :type "password"}]
-             [:input {:type "submit"
-                      :onClick #(get-datasets state)
-                      :value "Load"}]]
+           [[:h3
+             "Calculate the s-Values for a dataset grouped by a chosen column"]
+            [:p
+             [:span.highlight
+              "By JSON URL:"
+              [:input#url
+               {:onBlur #(swap! state assoc :json-url (.. % -target -value))
+                :size 60
+                :value "https://data.cityofnewyork.us/resource/w7a6-9xrz.json"}]
+              [:input {:type "submit"
+                       :onClick #(get-json-url state)
+                       :value "Load"}]]
+             [:span.disjunction-spacer "or"]
+             [:span.highlight
+              "Ona: username"
+              [:input#username
+               {:onBlur #(swap! state assoc :username (.. % -target -value))}]
+              "password"
+              [:input#password
+               {:onBlur #(swap! state assoc :password (.. % -target -value))
+                :type "password"}]
+              [:input {:type "submit"
+                       :onClick #(get-datasets state)
+                       :value "Load"}]]]
             (when datasets
               [:p
                [:select {:id dataset-id-select
@@ -272,11 +289,12 @@
                   [:option {:key formid
                             :value formid}
                    title])]
-               "or"
+               " or dataset ID "
                [:input {:key "dataset-id-enter"
                         :id dataset-id-enter
                         :value 137955
                         :type "number"}]
+               " only considers 1000 rows "
                [:input {:key "dataset-id-submit"
                         :type "submit"
                         :onClick #(do
@@ -293,20 +311,22 @@
                                  distinct
                                  (map full-name)
                                  sort)]
-                [[:p {:key "aggregation-column"}
-                  [:select {:id aggregation-col-id
-                            :key "agg-col-select"}
-                   (for [col columns]
-                     [:option {:key col
-                               :value col}
-                      col])]
-                  [:input {:key "agg-col-submit"
-                           :type "submit"
-                           :onClick #(swap! state
-                                            assoc
-                                            :aggregation-col
-                                            (get-aggregation-col))
-                           :value "Compute s-Values"}]]
+                [[:p.grouping {:key "aggregation-column"}
+                  [:span.highlight
+                   "Grouping column: "
+                   [:select {:id aggregation-col-id
+                             :key "agg-col-select"}
+                    (for [col columns]
+                      [:option {:key col
+                                :value col}
+                       col])]
+                   [:input {:key "agg-col-submit"
+                            :type "submit"
+                            :onClick #(swap! state
+                                             assoc
+                                             :aggregation-col
+                                             (get-aggregation-col))
+                            :value "Compute s-Values"}]]]
                  (when aggregation-col
                    (let [cols->scores (run-algorithm data
                                                      aggregation-col)
@@ -314,9 +334,9 @@
                          averages (compute-averages cols->scores)]
                      [[:div [:p
                              (count cols->scores)
-                             " of "
+                             " categorical of "
                              (count columns)
-                             " columns included below."]]
+                             " total columns included below."]]
                       [:table {:key "table"}
                        [:thead {:key "head"}
                         [:tr.highlight
