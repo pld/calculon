@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/pld/calculon.svg?branch=master)](https://travis-ci.org/pld/calculon)
+
 ## Calculon
 
 ![calculon](https://raw.githubusercontent.com/pld/calculon/master/docs/calculon.jpg)
