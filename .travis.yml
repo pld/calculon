@@ -1,5 +1,5 @@
 lein: lein2
 language: clojure
-script: lein2 cljs test
+script: lein2 cljsbuild test
 notifications:
   irc: 'irc.freenode.org#onatest'

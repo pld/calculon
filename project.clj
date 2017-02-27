@@ -7,7 +7,8 @@
                  [cljsjs/react-dom "15.2.1-1"]
                  [onaio/milia "0.3.28-auth-SNAPSHOT"]
                  [sablono "0.7.4"]]
-  :plugins [[lein-figwheel "0.5.8"]]
+  :plugins [[lein-cljsbuild "1.1.2"]
+            [lein-figwheel "0.5.8"]]
   :clean-targets [:target-path "out" "resources/public/cljs"]
   :cljsbuild {:builds
               [{:id "dev"
