@@ -4,7 +4,7 @@
 
 ![calculon](https://raw.githubusercontent.com/pld/calculon/master/docs/calculon.jpg)
 
-Create s-Values for Ona datasets on demand. Example output:
+Create s-Values (surprise values) for JSON files by URL and Ona datasets. Example output:
 
 ![screenshot](https://raw.githubusercontent.com/pld/calculon/master/docs/screenshot.png)
 
